@@ -8,6 +8,8 @@
 
 #include <Arduino.h>
 #include <RotaryEncoder.h>
+#include <FreqMeasure.h>
+
 
 typedef union {
 //    byte ar249_B[4];
@@ -39,7 +41,7 @@ constexpr float a = (m - 1) / (shortCutoff - longCutoff);
 constexpr float b = 1 - longCutoff * a;
 // a global variables to hold the last position
 static int lastPos, newPos;
-#define INITIAL_ENCODER_VALUE 12
+#define INITIAL_ENCODER_VALUE 1234
 
 int Hi_429 = 12;
 int Lo_429 = 11;
@@ -49,6 +51,8 @@ long t;
 
 ARINC429 dAR429;
 
+double sum=0;
+int count=0;
 
 
 // function copied from https://stackoverflow.com/questions/13247647/convert-integer-from-pure-binary-to-bcd
@@ -191,6 +195,7 @@ void setup() {
   pinMode(Lo_429, OUTPUT);
   pinMode(Debug,  OUTPUT);
  
+  FreqMeasure.begin();
   Serial.begin(115200); // Any baud rate should work
   Serial.println("djrm ARINC encoder\n");
 
@@ -246,10 +251,25 @@ void loop() {
   t=millis();
   if(t%250L == 0)
   {
-    data = lastPos * 10L;
+    data = abs(lastPos * 10);
     ARINC_data = ARINC429_BuildCommand(label, sdi, data, ssm);
     ARINC429_PrintCommand(ARINC_data);
     ARINC429_SendCommand(ARINC_data);
-  } 
+  }
+
+  if (FreqMeasure.available()) 
+  {
+    // average several reading together
+    sum = sum + FreqMeasure.read();
+    count = count + 1;
+    if (count > 30) 
+    {
+      float frequency = FreqMeasure.countToFrequency(sum / count);
+      Serial.println(frequency);
+      sum = 0;
+      count = 0;
+    }
+  }
+
 //  delay(200);
 }
