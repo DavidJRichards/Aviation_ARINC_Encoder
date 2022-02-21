@@ -6,6 +6,9 @@
 // ARINC tutorial: http://leonardodaga.insyde.it/Corsi/AD/Documenti/ARINCTutorial.pdf
 // ARINC info: https://www.altadt.com/wp-content/uploads/dlm_uploads/2013/11/ARINC-Protocol-Summary.pdf
 
+#include <Arduino.h>
+#include <RotaryEncoder.h>
+
 typedef union {
 //    byte ar249_B[4];
 //    word ar429_W[2];
@@ -20,11 +23,33 @@ typedef union {
     };
 } ARINC429;
 
+#define PIN_IN1 2
+#define PIN_IN2 3
+RotaryEncoder encoder(PIN_IN1, PIN_IN2, RotaryEncoder::LatchMode::TWO03);
+
+constexpr float m = 10;
+// at 200ms or slower, there should be no acceleration. (factor 1)
+constexpr float longCutoff = 50;
+// at 5 ms, we want to have maximum acceleration (factor m)
+constexpr float shortCutoff = 5;
+// To derive the calc. constants, compute as follows:
+// On an x(ms) - y(factor) plane resolve a linear formular factor(ms) = a * ms + b;
+// where  f(4)=10 and f(200)=1
+constexpr float a = (m - 1) / (shortCutoff - longCutoff);
+constexpr float b = 1 - longCutoff * a;
+// a global variables to hold the last position
+static int lastPos, newPos;
+#define INITIAL_ENCODER_VALUE 12
+
 int Hi_429 = 12;
 int Lo_429 = 11;
 int Debug  = 13;
 
+long t;
+
 ARINC429 dAR429;
+
+
 
 // function copied from https://stackoverflow.com/questions/13247647/convert-integer-from-pure-binary-to-bcd
 long bin2BCD(long binary) { // double dabble: 8 decimal digits in 32 bits BCD
@@ -62,7 +87,7 @@ word ARINC429_ComputeMSBParity(unsigned long ar429_L)
   unsigned long bitmask = 1L;
 
   // check all bits except parity bit
-  for(bitnum = 0, bitmask = 1L; bitnum<=31; bitnum += 1, bitmask <<= 1L)
+  for(bitnum = 0, bitmask = 1L; bitnum<31; bitnum += 1, bitmask <<= 1L)
   {
     if(ar429_L & bitmask)
       parity++; 
@@ -168,6 +193,9 @@ void setup() {
  
   Serial.begin(115200); // Any baud rate should work
   Serial.println("djrm ARINC encoder\n");
+
+  lastPos = newPos= INITIAL_ENCODER_VALUE;
+  encoder.setPosition(lastPos);
 }
 
 void loop() {
@@ -175,14 +203,53 @@ void loop() {
   unsigned long data, ARINC_data;
   word label, sdi, ssm;
 
+  encoder.tick();
+  newPos = encoder.getPosition();
+  if (lastPos != newPos) {
+
+    // accelerate when there was a previous rotation in the same direction.
+
+    unsigned long ms = encoder.getMillisBetweenRotations();
+
+    if (ms < longCutoff) {
+      // do some acceleration using factors a and b
+
+      // limit to maximum acceleration
+      if (ms < shortCutoff) {
+        ms = shortCutoff;
+      }
+
+      float ticksActual_float = a * ms + b;
+      Serial.print("  f= ");
+      Serial.println(ticksActual_float);
+
+      long deltaTicks = (long)ticksActual_float * (newPos - lastPos);
+      Serial.print("  d= ");
+      Serial.println(deltaTicks);
+
+      newPos = newPos + deltaTicks;
+      encoder.setPosition(newPos);
+    }
+
+    Serial.print(newPos);
+    Serial.print("  ms: ");
+    Serial.println(ms);
+    lastPos = newPos;
+  } // if
+
+
   label = 0201;  // octal
   sdi   = 0;
-  data  = 25786; // decimal
+//  data  = 25786; // decimal
   ssm   = 0;
 
-  ARINC_data = ARINC429_BuildCommand(label, sdi, data, ssm);
-  ARINC429_PrintCommand(ARINC_data);
-  ARINC429_SendCommand(ARINC_data);
-    
-  delay(100);
+  t=millis();
+  if(t%250L == 0)
+  {
+    data = lastPos * 10L;
+    ARINC_data = ARINC429_BuildCommand(label, sdi, data, ssm);
+    ARINC429_PrintCommand(ARINC_data);
+    ARINC429_SendCommand(ARINC_data);
+  } 
+//  delay(200);
 }
