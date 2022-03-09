@@ -56,6 +56,8 @@ Schematic of prototype:
 
 ## HSI wiring
 
+[HSI Connection document](./Smiths-HSI-pinout.ods)
+
 ![HSI-encoder-wiring](./images/HSI-encoder-wiring.jpg)
 
 ## HSI LED display

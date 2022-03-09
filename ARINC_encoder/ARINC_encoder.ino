@@ -1,6 +1,7 @@
 // djrm ARINC encoder
 // David Richards, 2022 Feb 10
-// Initial - untested
+// Initial - working
+// display value controlled by rotary encoder
 
 // based on idea here: https://www.youtube.com/watch?v=ih7ZmV-XU-I
 // ARINC tutorial: http://leonardodaga.insyde.it/Corsi/AD/Documenti/ARINCTutorial.pdf
@@ -8,6 +9,9 @@
 
 #include <Arduino.h>
 #include <RotaryEncoder.h>
+
+
+
 #include <FreqMeasure.h>
 
 
@@ -41,6 +45,8 @@ constexpr float a = (m - 1) / (shortCutoff - longCutoff);
 constexpr float b = 1 - longCutoff * a;
 // a global variables to hold the last position
 static int lastPos, newPos;
+
+#define FUDGE_FACTOR 0.993
 #define INITIAL_ENCODER_VALUE 1234
 
 int Hi_429 = 12;
@@ -264,7 +270,7 @@ void loop() {
     count = count + 1;
     if (count > 30) 
     {
-      float frequency = FreqMeasure.countToFrequency(sum / count);
+      float frequency = FUDGE_FACTOR * FreqMeasure.countToFrequency(sum / count);
       Serial.println(frequency);
       sum = 0;
       count = 0;
