@@ -1,5 +1,11 @@
 # Aviation-ARINC-encoder
 
+## Arduino mini MAX3232 ARINC signal.
+
+![mini encoder](./images/mini-encoder.jpg)
+
+An advantage of this simple interface is that it uses the MAX3232 charge pump to generate the bidirectional signals and the whole inteface is driven from the Arduino USB power input.
+
 ## software
 
 Experimental Arduino sketch to encode display data for display on HSI unit.
